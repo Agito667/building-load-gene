@@ -194,10 +194,11 @@ def calculate_hourly(p: BuildingParams, weather_df: pd.DataFrame) -> pd.DataFram
         + df["people_latent_load_kw"]
     )
 
-    # 能耗（默认时间步长 1 小时）
-    df["cooling_energy_sensible_kwh"] = df["cooling_load_sensible_kw"]
-    df["heating_energy_kwh"] = df["heating_load_kw"]
-    df["cooling_energy_total_kwh"] = df["cooling_load_total_kw"]
+    # 能耗（根据时间步长计算）
+    time_step_h = p.time_step_minutes / 60.0
+    df["cooling_energy_sensible_kwh"] = df["cooling_load_sensible_kw"] * time_step_h
+    df["heating_energy_kwh"] = df["heating_load_kw"] * time_step_h
+    df["cooling_energy_total_kwh"] = df["cooling_load_total_kw"] * time_step_h
 
     return df
 

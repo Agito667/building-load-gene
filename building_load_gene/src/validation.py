@@ -96,6 +96,12 @@ def validate_params(params: BuildingParams) -> Tuple[List[str], List[str]]:
         if params.floor_area_manual is None or params.floor_area_manual <= 0:
             errors.append("手动建筑面积必须为正数")
 
+    # 时间步长
+    if params.time_step_minutes < 10 or params.time_step_minutes > 120:
+        errors.append("时间步长必须在 10~120 分钟之间")
+    if params.time_step_minutes % 10 != 0:
+        errors.append("时间步长必须为 10 的整数倍")
+
     return errors, warnings
 
 

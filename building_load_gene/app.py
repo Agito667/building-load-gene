@@ -75,7 +75,7 @@ def main():
 
 - **冷负荷显热（式 6-26）** 与 **空调总冷负荷（含潜热）** 需要区分
 - 潜热附加项不属于式 6-26 显热负荷
-- 默认时间步长为 1 小时，逐时 kW 求和即为 kWh
+- 默认时间步长为 1 小时（可在建筑参数中调节，范围 10~120 分钟，步进 10 分钟），能耗 = 功率 × 时间步长
 
 ## 运行方式
 
@@ -127,7 +127,14 @@ streamlit run app.py
                 for i, (field_name, label, unit) in enumerate(fields):
                     val = getattr(params, field_name)
                     with cols[i % 3]:
-                        if isinstance(val, int):
+                        if field_name == "time_step_minutes":
+                            new_val = st.select_slider(
+                                f"{label} ({unit})",
+                                options=list(range(10, 121, 10)),
+                                value=val,
+                                key=f"param_{field_name}",
+                            )
+                        elif isinstance(val, int):
                             new_val = st.number_input(
                                 f"{label} ({unit})", value=val, step=1, key=f"param_{field_name}"
                             )
@@ -268,7 +275,7 @@ streamlit run app.py
                     with st.spinner("正在计算..."):
                         result_df = calculate_hourly(params, norm_df)
                         st.session_state.result_df = result_df
-                    st.success(f"计算完成！共 {len(result_df)} 小时结果")
+                    st.success(f"计算完成！共 {len(result_df)} 个时间步结果（步长 {params.time_step_minutes} 分钟）")
 
     # ==================== Tab 4: 计算结果 ====================
     with tab4:

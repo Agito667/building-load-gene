@@ -62,6 +62,9 @@ class BuildingParams:
     occupancy_start_hour: int = 8              # 占用开始时间
     occupancy_end_hour: int = 18               # 占用结束时间
 
+    # 时间步长
+    time_step_minutes: int = 60                # 计算时间步长，分钟（10~120，步进10）
+
     # 建筑面积计算方式
     floor_area_mode: str = "auto"              # "auto" 或 "manual"
     floor_area_manual: Optional[float] = None  # 手动输入的建筑面积
@@ -156,5 +159,8 @@ PARAM_GROUPS = {
     "运行时间参数": [
         ("occupancy_start_hour", "占用开始时间", "小时"),
         ("occupancy_end_hour", "占用结束时间", "小时"),
+    ],
+    "计算时间步长": [
+        ("time_step_minutes", "时间步长", "分钟"),
     ],
 }
