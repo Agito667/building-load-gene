@@ -1,7 +1,7 @@
 """CTM 特征温度法核心计算模块。"""
 import numpy as np
 import pandas as pd
-from typing import Dict
+from typing import Dict, List
 
 from .models import BuildingParams
 
@@ -270,3 +270,152 @@ def get_peak_hours(df: pd.DataFrame, col: str, top_n: int = 20) -> pd.DataFrame:
     sorted_df.index = sorted_df.index + 1
     sorted_df.index.name = "排名"
     return sorted_df
+
+
+def generate_formulas(p: BuildingParams) -> List[dict]:
+    """生成计算公式说明列表，每项包含 title 和 lines，供界面展示。
+
+    返回:
+        列表，每项为 {"title": str, "lines": [str, ...]}
+    """
+    h = calc_h_values(p)
+    floor_area = p.floor_area
+    window_total = p.window_area_total
+    wall_total = p.wall_area_total
+    time_step_h = p.time_step_minutes / 60.0
+
+    sections = []
+
+    # 1. 建筑面积
+    if p.floor_area_mode == "manual":
+        sections.append({
+            "title": "建筑面积",
+            "lines": [
+                f"建筑面积 A = 手动输入 = {floor_area:.1f} m²",
+            ]
+        })
+    else:
+        sections.append({
+            "title": "建筑面积",
+            "lines": [
+                f"建筑面积 A = 体积 V / 层高 h = {p.volume:.1f} / {p.floor_height:.1f} = {floor_area:.1f} m²",
+            ]
+        })
+
+    # 2. 传热反应系数 H
+    sections.append({
+        "title": "各分项传热反应系数 H（W/K）",
+        "lines": [
+            f"H_外墙 = U_外墙 × A_外墙总面积 = {p.u_wall:.4f} × ({p.wall_area_east:.1f}+{p.wall_area_west:.1f}+{p.wall_area_south:.1f}+{p.wall_area_north:.1f}) = {p.u_wall:.4f} × {wall_total:.1f} = {h['h_wall_w_per_k']:.2f} W/K",
+            f"H_屋面 = U_屋面 × A_屋面 = {p.u_roof:.4f} × {p.roof_area:.1f} = {h['h_roof_w_per_k']:.2f} W/K",
+            f"H_外窗 = U_外窗 × A_外窗总面积 = {p.u_window:.4f} × ({p.window_area_east:.1f}+{p.window_area_west:.1f}+{p.window_area_south:.1f}+{p.window_area_north:.1f}) = {p.u_window:.4f} × {window_total:.1f} = {h['h_window_w_per_k']:.2f} W/K",
+            f"H_外门 = U_外门 × A_外门 = {p.u_door:.4f} × {p.door_area:.1f} = {h['h_door_w_per_k']:.2f} W/K",
+            f"H_通风 = ρ × c × n × V / 3600 = {p.air_density:.2f} × {p.air_specific_heat:.0f} × {p.air_change_rate:.2f} × {p.volume:.1f} / 3600 = {h['h_air_w_per_k']:.2f} W/K",
+            f"H_总 = H_外墙+H_屋面+H_外窗+H_外门+H_通风 = {h['h_wall_w_per_k']:.2f}+{h['h_roof_w_per_k']:.2f}+{h['h_window_w_per_k']:.2f}+{h['h_door_w_per_k']:.2f}+{h['h_air_w_per_k']:.2f} = {h['h_total_w_per_k']:.2f} W/K",
+        ]
+    })
+
+    # 3. 太阳空气温度
+    sections.append({
+        "title": "太阳空气温度 T_sa（℃）",
+        "lines": [
+            f"T_sa = T_室外 + α × I / h_室外",
+            f"其中：外表面太阳吸收率 α = {p.solar_absorptance:.2f}，室外综合换热系数 h_室外 = {p.outdoor_heat_transfer_coeff:.1f} W/(m²·K)",
+            f"各朝向分别代入对应太阳辐射 I（东/西/南/北/屋面水平面）",
+        ]
+    })
+
+    # 4. 玻璃太阳得热
+    sections.append({
+        "title": "玻璃太阳得热 Q_glass（W）",
+        "lines": [
+            f"Q_glass = SHGC × K_遮 × (A_东窗×I_东 + A_西窗×I_西 + A_南窗×I_南 + A_北窗×I_北)",
+            f"其中：SHGC = {p.shgc:.4f}，K_遮 = {p.shade_factor:.4f}",
+            f"A_东窗 = {p.window_area_east:.1f} m²，A_西窗 = {p.window_area_west:.1f} m²，A_南窗 = {p.window_area_south:.1f} m²，A_北窗 = {p.window_area_north:.1f} m²",
+        ]
+    })
+
+    # 5. 内部负荷
+    sections.append({
+        "title": "内部显热负荷 Q_internal（W）",
+        "lines": [
+            f"Q_internal = f_占用 × A × (q_照明 + q_设备 + d_人员 × Q_人显)",
+            f"其中：建筑面积 A = {floor_area:.1f} m²",
+            f"q_照明 = {p.lighting_power_density:.1f} W/m²，q_设备 = {p.equipment_power_density:.1f} W/m²",
+            f"d_人员 = {p.occupant_density:.4f} 人/m²，Q_人显 = {p.person_sensible_heat:.1f} W/人",
+            f"f_占用：{p.occupancy_start_hour}:00~{p.occupancy_end_hour}:00 为 1，其余为 0",
+        ]
+    })
+
+    # 6. 含湿量
+    sections.append({
+        "title": "含湿量计算（Antoine 型公式）",
+        "lines": [
+            f"饱和水汽压：P_ws = 0.61078 × exp(17.2694 × T / (T + 237.3))  （kPa）",
+            f"水蒸气分压力：P_w = RH/100 × P_ws  （kPa）",
+            f"含湿量：w = 0.62198 × P_w / (P_大气 - P_w)  （kg/kg干空气）",
+            f"其中：大气压力 P_大气 = {p.atmospheric_pressure:.3f} kPa",
+        ]
+    })
+
+    # 7. 分项特征温度
+    sections.append({
+        "title": "各分项特征温度 t_inf（℃）",
+        "lines": [
+            f"t_inf_外墙 = U_外墙 × Σ(A_i × T_sa_i) / H_总",
+            f"t_inf_屋面 = U_屋面 × A_屋面 × T_sa_屋面 / H_总",
+            f"t_inf_外窗 = U_外窗 × A_外窗总面积 × T_室外 / H_总",
+            f"t_inf_外门 = U_外门 × A_外门 × T_室外 / H_总",
+            f"t_inf_通风 = H_通风 × T_室外 / H_总",
+            f"t_inf_玻璃得热 = Q_glass / H_总",
+            f"t_inf_内部负荷 = Q_internal / H_总",
+            f"其中 H_总 = {h['h_total_w_per_k']:.2f} W/K",
+        ]
+    })
+
+    # 8. 关机总特征温度
+    sections.append({
+        "title": "关机总特征温度 t∞_shut（℃）",
+        "lines": [
+            f"t∞_shut = t_inf_外墙 + t_inf_屋面 + t_inf_外窗 + t_inf_外门 + t_inf_通风 + t_inf_玻璃得热 + t_inf_内部负荷",
+        ]
+    })
+
+    # 9. 式 6-26 冷负荷与供暖负荷
+    sections.append({
+        "title": "式 6-26 冷负荷与供暖负荷",
+        "lines": [
+            f"冷负荷显热（kW）= max(0, t∞_shut - T_冷设定) × H_总 / 1000",
+            f"其中：空调设定温度 T_冷设定 = {p.cooling_setpoint:.1f} ℃",
+            f"",
+            f"供暖负荷（kW）= max(0, T_暖设定 - t∞_shut) × H_总 / 1000",
+            f"其中：供暖设定温度 T_暖设定 = {p.heating_setpoint:.1f} ℃",
+        ]
+    })
+
+    # 10. 潜热负荷
+    sections.append({
+        "title": "潜热附加冷负荷",
+        "lines": [
+            f"通风潜热（kW）= ρ × n × V × r × max(0, w_室外 - w_室内) / (3600 × 1000)",
+            f"其中：ρ = {p.air_density:.2f} kg/m³，n = {p.air_change_rate:.2f} h⁻¹，V = {p.volume:.1f} m³",
+            f"r（汽化潜热）= {p.latent_heat_vaporization:.0f} J/kg",
+            f"w_室内：按 T_冷设定={p.cooling_setpoint:.1f}℃、RH={p.indoor_cooling_rh:.0f}% 计算",
+            f"",
+            f"人员潜热（kW）= f_占用 × A × d_人员 × Q_人潜 / 1000",
+            f"其中：Q_人潜 = {p.person_latent_heat:.1f} W/人",
+            f"",
+            f"以上潜热仅在冷负荷显热 > 0 时累加",
+        ]
+    })
+
+    # 11. 能耗
+    sections.append({
+        "title": "能耗计算",
+        "lines": [
+            f"能耗（kWh）= 负荷（kW）× 时间步长（h）",
+            f"时间步长 = {p.time_step_minutes} 分钟 = {time_step_h:.2f} h",
+        ]
+    })
+
+    return sections

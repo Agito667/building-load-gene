@@ -15,7 +15,7 @@ from src.validation import validate_params, validate_weather_dataframe
 from src.calculator import (
     calc_h_values, calculate_hourly,
     calc_daily_summary, calc_monthly_summary,
-    get_peak_hours,
+    get_peak_hours, generate_formulas,
 )
 from src.io_utils import (
     read_csv, read_excel, get_excel_sheet_names,
@@ -364,6 +364,20 @@ streamlit run app.py
             if len(peak_total_df) > 0:
                 st.markdown("**空调总冷负荷前 20 小时**")
                 st.dataframe(peak_total_df, use_container_width=True)
+
+            # 计算验证公式
+            st.divider()
+            st.subheader("计算验证 —— 公式依据")
+            st.caption("以下列出本次计算所用的全部公式及代入的实际参数值，供使用者验算核对。")
+
+            formula_sections = generate_formulas(params)
+            for sec in formula_sections:
+                with st.expander(sec["title"], expanded=False):
+                    for line in sec["lines"]:
+                        if line == "":
+                            st.markdown("&nbsp;")
+                        else:
+                            st.code(line, language=None)
 
     # ==================== Tab 5: 图表与导出 ====================
     with tab5:
