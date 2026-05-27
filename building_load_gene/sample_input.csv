@@ -1,0 +1,4 @@
+date,time,outdoor_temp,relative_humidity,ghi,solar_north,solar_east,solar_south,solar_west
+2005-08-22,16:00,35.2,58,620,80,240,360,520
+2005-01-21,07:00,1.5,75,0,0,0,0,0
+2005-04-15,12:00,24.0,65,700,120,300,420,300
