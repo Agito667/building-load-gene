@@ -373,11 +373,7 @@ streamlit run app.py
             formula_sections = generate_formulas(params)
             for sec in formula_sections:
                 with st.expander(sec["title"], expanded=False):
-                    for line in sec["lines"]:
-                        if line == "":
-                            st.markdown("&nbsp;")
-                        else:
-                            st.code(line, language=None)
+                    st.code("\n".join(sec["lines"]), language="text")
 
     # ==================== Tab 5: 图表与导出 ====================
     with tab5:
