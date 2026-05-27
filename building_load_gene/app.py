@@ -128,10 +128,9 @@ streamlit run app.py
                     val = getattr(params, field_name)
                     with cols[i % 3]:
                         if field_name == "time_step_minutes":
-                            new_val = st.select_slider(
-                                f"{label} ({unit})",
-                                options=list(range(10, 121, 10)),
-                                value=val,
+                            new_val = st.number_input(
+                                f"{label} ({unit})", value=val,
+                                min_value=10, max_value=120, step=10,
                                 key=f"param_{field_name}",
                             )
                         elif isinstance(val, int):

@@ -85,7 +85,7 @@ def validate_params(params: BuildingParams) -> Tuple[List[str], List[str]]:
     if params.indoor_cooling_rh < 0 or params.indoor_cooling_rh > 100:
         errors.append("室内冷房相对湿度必须在 0~100 之间")
 
-    # 运行时间
+    # 时间参数
     if params.occupancy_start_hour < 0 or params.occupancy_start_hour > 23:
         errors.append("占用开始时间必须在 0~23 之间")
     if params.occupancy_end_hour < 0 or params.occupancy_end_hour > 24:
